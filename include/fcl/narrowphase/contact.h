@@ -68,7 +68,10 @@ struct FCL_EXPORT Contact
   /// @brief contact normal, pointing from o1 to o2
   Vector3<S> normal;
 
-  /// @brief contact position, in world space
+  /// @brief contact position, in world space. It is defined such that
+  /// `pos + normal * penetration_depth / 2` is a point lying on the
+  /// surface of `o1`, and, similarly, `pos - normal * penetration_depth / 2` is
+  /// a point lying on the surface of `o2`.
   Vector3<S> pos;
 
   /// @brief penetration depth
