@@ -49,7 +49,7 @@ namespace detail {
 // Helper struct for determining the underlying numerical type of scalars.
 // Allows us to treat AutoDiffScalar<double> and double as double type and
 // AutoDiffScalar<float> and float as float type.
-template<typename S>
+template <typename S>
 struct ScalarTrait {
   // NOTE: This relies on AutoDiffScalar's `Real` class member and serves as
   // an entry path for any custom scalar class that likewise defines a `Real`
@@ -57,17 +57,17 @@ struct ScalarTrait {
   typedef typename S::Real type;
 };
 
-template<>
+template <>
 struct ScalarTrait<long double> {
   typedef long double type;
 };
 
-template<>
+template <>
 struct ScalarTrait<double> {
   typedef double type;
 };
 
-template<>
+template <>
 struct ScalarTrait<float> {
   typedef float type;
 };
