@@ -61,6 +61,14 @@ bool sphereSphereDistance(const Sphere<double>& s1, const Transform3<double>& tf
                           double* dist, Vector3<double>* p1, Vector3<double>* p2);
 
 //==============================================================================
+extern template
+FCL_EXPORT
+double sphereSphereSignedDistance(
+    const Sphere<double>& s1, const Transform3<double>& tf1,
+    const Sphere<double>& s2, const Transform3<double>& tf2,
+    Vector3<double>* p1, Vector3<double>* p2);
+
+//==============================================================================
 template <typename S>
 FCL_EXPORT
 bool sphereSphereIntersect(const Sphere<S>& s1, const Transform3<S>& tf1,
@@ -106,6 +114,31 @@ bool sphereSphereDistance(const Sphere<S>& s1, const Transform3<S>& tf1,
 
   if(dist) *dist = -1;
   return false;
+}
+
+template <typename S>
+FCL_EXPORT
+S sphereSphereSignedDistance(const Sphere<S>& s1, const Transform3<S>& X_WS1,
+                             const Sphere<S>& s2, const Transform3<S>& X_WS2,
+                             Vector3<S>* p_WN1, Vector3<S>* p_WN2)
+{
+  Vector3<S> p_WS1 = X_WS1.translation();
+  Vector3<S> p_WS2 = X_WS2.translation();
+  Vector3<S> p_S2S1_W = p_WS1 - p_WS2;
+  S center_distance = p_S2S1_W.norm();
+
+  // Negative for penetration, positive for separated, zero for touching.
+  S distance = center_distance - (s1.radius + s2.radius);
+  if (p_WN1 || p_WN2) {
+    const S eps = constants<S>::eps();
+    // Unit normal pointing in the direction from S2's center to S1's center.
+    const Vector3<S> n_S2S1 = center_distance < eps
+                                  ? Vector3<S>{1, 0, 0}
+                                  : (p_S2S1_W / center_distance).eval();
+    if (p_WN1) *p_WN1 = p_WS1 - n_S2S1 * s1.radius;
+    if (p_WN2) *p_WN2 = p_WS2 + n_S2S1 * s2.radius;
+  }
+  return distance;
 }
 
 } // namespace detail

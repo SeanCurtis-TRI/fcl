@@ -178,14 +178,7 @@ GTEST_TEST(FCL_SPHERE_SPHERE, Separating_Spheres_INDEP) {
 }
 
 GTEST_TEST(FCL_SPHERE_SPHERE, Separating_Spheres_LIBCCD) {
-  // TODO(hongkai.dai@tri.global): The accuracy of the closest point is only up
-  // to 1E-3, although gjkSolver::distance_tolerance is 1E-6. We should
-  // investigate the accuracy issue.
-  // Specifically, when setting `enable_signed_distance = true`, then except for
-  // the the pair of spheres (2, 3), the closest point between all other pairs
-  // fail to achieve tolerance 1E-6. When `enable_signed_distance = false`, then
-  // all pairs achieve tolerance 1E-6.
-  TestSeparatingSpheres<double>(1E-3, fcl::GJKSolverType::GST_LIBCCD);
+  TestSeparatingSpheres<double>(1E-15, fcl::GJKSolverType::GST_LIBCCD);
 }
 //==============================================================================
 int main(int argc, char* argv[]) {

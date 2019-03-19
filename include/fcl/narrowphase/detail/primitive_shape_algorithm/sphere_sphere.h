@@ -57,6 +57,46 @@ bool sphereSphereDistance(const Sphere<S>& s1, const Transform3<S>& tf1,
                           const Sphere<S>& s2, const Transform3<S>& tf2,
                           S* dist, Vector3<S>* p1, Vector3<S>* p2);
 
+/** @brief Computes the signed distance between two spheres (with supporting
+ witnesses).
+
+ The returned distance value will be positive if the spheres are
+ separated, zero if they are touching, and negative if they are penetrating.
+ The witness points (N1 and N2) are points that lie on the surface of spheres 1
+ and 2, respectively. If the spheres are separated, they will be the _closest_
+ points on the spheres to each other. If the distance is zero, they should be
+ coincident to the single point of contact. If the distance is negative, they
+ are the two extremal points in the direction of the gradient of the signed
+ distance value.
+
+ More generally, it should be true that:
+
+ `|dist| = ||p_WN1 - p_WN2||`.
+
+ @note: if the sphere centers are coincident (within a small numerical
+ tolerance) the gradient of the signed distance function is undefined. Therefore
+ the gradient direction is arbitrarily defined to be the world's positive
+ x-axis.
+
+ <!-- TODO(SeanCurtis-TRI): Refactor the generic parts of this conversation
+ about signed distance that is independent of shape type somewhere else. -->
+
+ @param s1      The first sphere (centered on the origin of frame S1).
+ @param X_WS1   The pose of sphere 1 relative to the world frame.
+ @param s1      The second sphere (centered on the origin of frame S2).
+ @param X_WS1   The pose of sphere 2 relative to the world frame.
+ @param p_WN1   If non-null, this will contain the _witness_ point N1 on sphere
+                1 measured and expressed in the world frame.
+ @param p_WN2   If non-null, this will contain the _witness_ point N2 on sphere
+                2 measured and expressed in the world frame.
+ @returns       The signed distance between spheres.
+ @tparam S      The scalar type for calculation.
+ */
+template <typename S>
+S sphereSphereSignedDistance(const Sphere<S>& s1, const Transform3<S>& X_WS1,
+                             const Sphere<S>& s2, const Transform3<S>& X_WS2,
+                             Vector3<S>* p_WN1, Vector3<S>* p_WN2);
+
 } // namespace detail
 } // namespace fcl
 
