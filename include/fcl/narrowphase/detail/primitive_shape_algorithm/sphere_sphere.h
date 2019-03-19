@@ -75,8 +75,8 @@ bool sphereSphereDistance(const Sphere<S>& s1, const Transform3<S>& tf1,
 
  @note: if the sphere centers are coincident (within a small numerical
  tolerance) the gradient of the signed distance function is undefined. Therefore
- the gradient direction is arbitrarily defined to be the world's positive
- x-axis.
+ the gradient direction is arbitrarily defined to be the sphere 2's positive
+ x-axis measured and expressed in the world frame.
 
  <!-- TODO(SeanCurtis-TRI): Refactor the generic parts of this conversation
  about signed distance that is independent of shape type somewhere else. -->

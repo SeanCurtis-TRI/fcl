@@ -1,6 +1,7 @@
 set(tests
-    test_sphere_box.cpp
-    test_sphere_cylinder.cpp
+        test_sphere_box.cpp
+        test_sphere_cylinder.cpp
+        test_sphere_sphere.cpp
 )
 
 # Build all the tests
