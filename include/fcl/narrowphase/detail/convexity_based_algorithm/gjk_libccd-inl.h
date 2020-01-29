@@ -1507,8 +1507,7 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
       if (it == map_vertex_to_new_edge.end()) {
         // This edge has not been added yet.
         e[i] = ccdPtAddEdge(polytope, new_vertex, border_edge->vertex[i]);
-        map_vertex_to_new_edge.emplace_hint(it, border_edge->vertex[i],
-                                            e[i]);
+        map_vertex_to_new_edge.emplace_hint(it, border_edge->vertex[i], e[i]);
       } else {
         e[i] = it->second;
       }
@@ -1816,14 +1815,14 @@ static int __ccdEPA(const void *obj1, const void *obj2,
         *nearest = ccdPtNearest(polytope);
       }
 
-        // get next support point
-        if (nextSupport(polytope, obj1, obj2, ccd, *nearest, &supp) != 0) {
-            break;
-        }
+      // get next support point
+      if (nextSupport(polytope, obj1, obj2, ccd, *nearest, &supp) != 0) {
+	break;
+      }
 
-        // expand nearest triangle using new point - supp
-        if (expandPolytope(polytope, *nearest, &supp) != 0)
-            return -2;
+      // expand nearest triangle using new point - supp
+      if (expandPolytope(polytope, *nearest, &supp) != 0)
+	return -2;
     }
 
     return 0;
