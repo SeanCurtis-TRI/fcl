@@ -975,17 +975,16 @@ static bool is_point_on_line_segment(const ccd_vec3_t& p, const ccd_vec3_t& a,
 }
 
 /**
- * Computes the normal vector of a triangular face on a polytope, and the normal
- * vector points outward from the polytope. Notice we assume that the origin
- * lives within the polytope, and the normal vector may not have unit length.
- * @param[in] polytope The polytope on which the face lives. We assume that the
- * origin also lives inside the polytope.
+ * Computes the unit-length normal vector of a triangular face on a polytope,
+ * such that the vector points outward from the polytope. Notice we assume that
+ * the origin lives within the polytope.
+ * @param[in] polytope The polytope on which the face lives.
  * @param[in] face The face for which the normal vector is computed.
- * @retval dir The vector normal to the face, and points outward from the
- * polytope. `dir` is unnormalized, that it does not necessarily have a unit
- * length.
+ * @retval dir The unit-length vector normal to the face, and points outward
+ * from the polytope.
  * @throws UnexpectedConfigurationException if built in debug mode _and_ the
- * triangle has zero area (either by being too small, or being co-linear).
+ * triangle is ill-conditioned -- a normal cannot be robustly inferred -- as
+ * having almost zero area of co-linear vertices.
  */
 static ccd_vec3_t faceNormalPointingOutward(const ccd_pt_t* polytope,
                                             const ccd_pt_face_t* face) {
@@ -1003,13 +1002,23 @@ static ccd_vec3_t faceNormalPointingOutward(const ccd_pt_t* polytope,
         "Cannot compute face normal for a degenerate (zero-area) triangle");
   }
 #endif
-  // We find two edges of the triangle as e1 and e2, and the normal vector
-  // of the face is e1.cross(e2).
+  // We find two edges of the triangle as e1 and e2, normalize them as e_hat1
+  // and ehat_2 and the normal vector of the face is e_hat1 x e_hat2.
+  // TODO(SeanCurtis-TRI): Currently, the normal we compute depends on the
+  //  ordering of the edges. For the exact same locations of the triangle
+  //  vertices, this can change our normal based on the permutation of the
+  //  vertex order (as represented by the edge order). We might consider making
+  //  this order invariant by using a criteria for which two edges we use.
   ccd_vec3_t e1, e2;
   ccdVec3Sub2(&e1, &(face->edge[0]->vertex[1]->v.v),
               &(face->edge[0]->vertex[0]->v.v));
   ccdVec3Sub2(&e2, &(face->edge[1]->vertex[1]->v.v),
               &(face->edge[1]->vertex[0]->v.v));
+  // Normalize the edges before crossing them.
+  const ccd_real_t e1_norm = std::sqrt(ccdVec3Len2(&e1));
+  ccdVec3Scale(&e1, 1.0 / e1_norm);
+  const ccd_real_t e2_norm = std::sqrt(ccdVec3Len2(&e2));
+  ccdVec3Scale(&e2, 1.0 / e2_norm);
   ccd_vec3_t dir;
   // TODO(hongkai.dai): we ignore the degeneracy here, namely we assume e1 and
   // e2 are not colinear. We should check if e1 and e2 are colinear, and handle
@@ -1046,7 +1055,7 @@ static ccd_vec3_t faceNormalPointingOutward(const ccd_pt_t* polytope,
     // Origin is more than `dist_tol` away from the plane, but the negative
     // value implies that the normal vector is pointing in the wrong direction;
     // flip it.
-    ccdVec3Scale(&dir, ccd_real_t(-1));
+    ccdVec3Scale(&unit_dir, ccd_real_t(-1));
   } else if (-dist_tol <= origin_distance_to_plane &&
              origin_distance_to_plane <= dist_tol) {
     // The origin is close to the plane of the face. Pick another vertex to test
@@ -1066,14 +1075,15 @@ static ccd_vec3_t faceNormalPointingOutward(const ccd_pt_t* polytope,
           ccdVec3Dot(&unit_dir, &(v->v.v)) - origin_distance_to_plane;
       if (distance_to_plane > dist_tol) {
         // The vertex is at least dist_tol away from the face plane, on the same
-        // direction of `dir`. So we flip dir to point it outward from the
-        // polytope.
-        ccdVec3Scale(&dir, ccd_real_t(-1));
-        return dir;
+        // direction of `unit_dir`. So we flip unit_dir to point it outward from
+        // the polytope.
+        ccdVec3Scale(&unit_dir, ccd_real_t(-1));
+        return unit_dir;
       } else if (distance_to_plane < -dist_tol) {
         // The vertex is at least `dist_tol` away from the face plane, on the
-        // opposite direction of `dir`. So `dir` points outward already.
-        return dir;
+        // opposite direction of `unit_dir`. So `unit_dir` points outward
+        // already.
+        return unit_dir;
       } else {
         max_distance_to_plane =
             std::max(max_distance_to_plane, distance_to_plane);
@@ -1084,12 +1094,13 @@ static ccd_vec3_t faceNormalPointingOutward(const ccd_pt_t* polytope,
     // If max_distance_to_plane > |min_distance_to_plane|, it means that the
     // vertices that are on the positive side of the plane, has a larger maximal
     // distance than the vertices on the negative side of the plane. Thus we
-    // regard that `dir` points into the polytope. Hence we flip `dir`.
+    // regard that `unit_dir` points into the polytope. Hence we flip
+    // `unit_dir`.
     if (max_distance_to_plane > std::abs(min_distance_to_plane)) {
-      ccdVec3Scale(&dir, ccd_real_t(-1));
+      ccdVec3Scale(&unit_dir, ccd_real_t(-1));
     }
   }
-  return dir;
+  return unit_dir;
 }
 
 // Return true if the point `pt` is on the outward side of the half-plane, on
@@ -1098,12 +1109,25 @@ static ccd_vec3_t faceNormalPointingOutward(const ccd_pt_t* polytope,
 // @param f A triangle on a polytope.
 // @param pt A point.
 static bool isOutsidePolytopeFace(const ccd_pt_t* polytope,
-                                const ccd_pt_face_t* f, const ccd_vec3_t* pt) {
-  ccd_vec3_t n = faceNormalPointingOutward(polytope, f);
+                                  const ccd_pt_face_t* f, const ccd_vec3_t* pt) {
+  ccd_vec3_t n_hat = faceNormalPointingOutward(polytope, f);
   // r_VP is the vector from a vertex V on the face `f`, to the point P `pt`.
   ccd_vec3_t r_VP;
-  ccdVec3Sub2(&r_VP, pt, &(f->edge[0]->vertex[0]->v.v));
-  return ccdVec3Dot(&n, &r_VP) > 0;
+  ccd_vec3_t& V = f->edge[0]->vertex[0]->v.v;
+  ccdVec3Sub2(&r_VP, pt, &V);
+  const ccd_real_t result = ccdVec3Dot(&n_hat, &r_VP);
+  // TODO(SeanCurtis-TRI): We want to avoid the introduction of co-planar faces.
+  //  If the point lies on the plane of the triangle, and it is deemed "not
+  //  visible", then will end up creating a triangle adjacent to this one that
+  //  is co-planar. Mathematically, test > 0 would be sufficient to guarantee
+  //  that. However, we can be co-planar to within numerical noise, and that
+  //  would affect libccd (see validateNearestFeatureOfPOlytopeBeingEdge() --
+  //  if we don't produce co-planar faces, lbiccd won't get confused). The goal
+  //  would be to set 0 to some value such that the faces are insufficiently
+  //  co-planar for libccd to report an edge. It comes down to whether the
+  //  common edge between this and the new face would be closest to the origin.
+  //  This function currently lacks the knowledge to assess that.
+  return result > 0;
 }
 
 #ifndef NDEBUG
@@ -1532,6 +1556,7 @@ static ccd_vec3_t supportEPADirection(const ccd_pt_t* polytope,
         // arbitrarily choose faces[0] normal.
         const ccd_pt_edge_t* edge =
             reinterpret_cast<const ccd_pt_edge_t*>(nearest_feature);
+        // Already unit length.
         dir = faceNormalPointingOutward(polytope, edge->faces[0]);
         break;
       }
@@ -1540,14 +1565,15 @@ static ccd_vec3_t supportEPADirection(const ccd_pt_t* polytope,
         // that face as the sample direction.
         const ccd_pt_face_t* face =
             reinterpret_cast<const ccd_pt_face_t*>(nearest_feature);
+        // Already unit length.
         dir = faceNormalPointingOutward(polytope, face);
         break;
       }
     }
   } else {
     ccdVec3Copy(&dir, &(nearest_feature->witness));
+    ccdVec3Normalize(&dir);
   }
-  ccdVec3Normalize(&dir);
   return dir;
 }
 
@@ -1700,9 +1726,9 @@ static void validateNearestFeatureOfPolytopeBeingEdge(ccd_pt_t* polytope) {
   std::array<ccd_vec3_t, 2> face_normals;
   std::array<double, 2> origin_to_face_distance;
   for (int i = 0; i < 2; ++i) {
+    // We expect that the normal is already unit length.
     face_normals[i] =
         faceNormalPointingOutward(polytope, nearest_edge->faces[i]);
-    ccdVec3Normalize(&face_normals[i]);
     // If the origin o is on the "inner" side of the face, then
     // n̂ ⋅ (o - vₑ) ≤ 0 or, with simplification, -n̂ ⋅ vₑ ≤ 0 (since n̂ ⋅ o = 0).
     origin_to_face_distance[i] =
