@@ -42,6 +42,7 @@
 #include "fcl/narrowphase/detail/failed_at_this_configuration.h"
 
 #include <array>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -1146,7 +1147,7 @@ static bool isOutsidePolytopeFace(const ccd_pt_t* polytope,
  */
 static bool ComputeVisiblePatchRecursiveSanityCheck(
     const ccd_pt_t& polytope,
-    const std::unordered_set<ccd_pt_edge_t*>& border_edges,
+    const std::set<ccd_pt_edge_t*>& border_edges,
     const std::unordered_set<ccd_pt_face_t*>& visible_faces,
     const std::unordered_set<ccd_pt_edge_t*>& internal_edges) {
   ccd_pt_face_t* f;
@@ -1200,7 +1201,7 @@ static bool ComputeVisiblePatchRecursiveSanityCheck(
  @throws ThrowFailedAtThisConfiguration if the edge is being re-classified.
  */
 static void ClassifyBorderEdge(ccd_pt_edge_t* edge,
-                        std::unordered_set<ccd_pt_edge_t*>* border_edges,
+                        std::set<ccd_pt_edge_t*>* border_edges,
                         std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
   border_edges->insert(edge);
   if (internal_edges->count(edge) > 0) {
@@ -1218,7 +1219,7 @@ static void ClassifyBorderEdge(ccd_pt_edge_t* edge,
  @throws ThrowFailedAtThisConfiguration if the edge is being re-classified.
  */
 static void ClassifyInternalEdge(ccd_pt_edge_t* edge,
-                          std::unordered_set<ccd_pt_edge_t*>* border_edges,
+                          std::set<ccd_pt_edge_t*>* border_edges,
                           std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
   internal_edges->insert(edge);
   if (border_edges->count(edge) > 0) {
@@ -1244,7 +1245,7 @@ static void ClassifyInternalEdge(ccd_pt_edge_t* edge,
 static void ComputeVisiblePatchRecursive(
     const ccd_pt_t& polytope, ccd_pt_face_t& f, int edge_index,
     const ccd_vec3_t& query_point,
-    std::unordered_set<ccd_pt_edge_t*>* border_edges,
+    std::set<ccd_pt_edge_t*>* border_edges,
     std::unordered_set<ccd_pt_face_t*>* visible_faces,
     std::unordered_set<ccd_pt_face_t*>* hidden_faces,
     std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
@@ -1359,7 +1360,7 @@ static void ComputeVisiblePatchRecursive(
 static void ComputeVisiblePatch(
     const ccd_pt_t& polytope, ccd_pt_face_t& f,
     const ccd_vec3_t& query_point,
-    std::unordered_set<ccd_pt_edge_t*>* border_edges,
+    std::set<ccd_pt_edge_t*>* border_edges,
     std::unordered_set<ccd_pt_face_t*>* visible_faces,
     std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
   assert(border_edges);
@@ -1460,7 +1461,7 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
 
   std::unordered_set<ccd_pt_face_t*> visible_faces;
   std::unordered_set<ccd_pt_edge_t*> internal_edges;
-  std::unordered_set<ccd_pt_edge_t*> border_edges;
+  std::set<ccd_pt_edge_t*> border_edges;
   ComputeVisiblePatch(*polytope, *start_face, newv->v, &border_edges,
                       &visible_faces, &internal_edges);
 
