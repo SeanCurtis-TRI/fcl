@@ -1476,7 +1476,12 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
 
   // Now remove all the obsolete edges.
   for (const auto& e : internal_edges) {
-    ccdPtDelEdge(polytope, e);
+    const int result = ccdPtDelEdge(polytope, e);
+    if (result) {
+      FCL_THROW_FAILED_AT_THIS_CONFIGURATION(
+          "In computing visible patch, deleting an internal edge failed");
+      break;
+    }
   }
 
   // Note: this does not delete any vertices that were on the interior of the

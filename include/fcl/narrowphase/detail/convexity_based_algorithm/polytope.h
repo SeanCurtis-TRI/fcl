@@ -233,6 +233,9 @@ _ccd_inline int ccdPtDelFace(ccd_pt_t *pt, ccd_pt_face_t *f)
         e = f->edge[i];
         if (e->faces[0] == f){
             e->faces[0] = e->faces[1];
+        } else if (e->faces[1] != f) {
+          throw std::runtime_error(
+              "Face references edges that don't reference the face");
         }
         e->faces[1] = NULL;
     }
