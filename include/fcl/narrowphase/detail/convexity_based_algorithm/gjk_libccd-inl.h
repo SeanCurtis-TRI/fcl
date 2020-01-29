@@ -1117,6 +1117,13 @@ static bool isOutsidePolytopeFace(const ccd_pt_t* polytope,
   ccd_vec3_t& V = f->edge[0]->vertex[0]->v.v;
   ccdVec3Sub2(&r_VP, pt, &V);
   const ccd_real_t result = ccdVec3Dot(&n_hat, &r_VP);
+  std::cerr << "___isOutsidePolytopeFace:"
+            << "\n    face: " << f
+            << "\n    normal: " << n_hat.v[0] << ", " << n_hat.v[1] << ", " << n_hat.v[2]
+            << "\n    V: " << V.v[0] << ", " << V.v[1] << ", " << V.v[2]
+            << "\n    P: " << pt->v[0] << ", " << pt->v[1] << ", " << pt->v[2]
+            << "\n    r_VP: " << r_VP.v[0] << ", " << r_VP.v[1] << ", " << r_VP.v[2]
+            << "\n    result: " << result << "\n___\n";
   // TODO(SeanCurtis-TRI): We want to avoid the introduction of co-planar faces.
   //  If the point lies on the plane of the triangle, and it is deemed "not
   //  visible", then will end up creating a triangle adjacent to this one that
@@ -1203,6 +1210,7 @@ static bool ComputeVisiblePatchRecursiveSanityCheck(
 static void ClassifyBorderEdge(ccd_pt_edge_t* edge,
                         std::set<ccd_pt_edge_t*>* border_edges,
                         std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
+  std::cerr << "      edge " << edge << " classified as border\n";
   border_edges->insert(edge);
   if (internal_edges->count(edge) > 0) {
     FCL_THROW_FAILED_AT_THIS_CONFIGURATION(
@@ -1221,6 +1229,7 @@ static void ClassifyBorderEdge(ccd_pt_edge_t* edge,
 static void ClassifyInternalEdge(ccd_pt_edge_t* edge,
                           std::set<ccd_pt_edge_t*>* border_edges,
                           std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
+  std::cerr << "    edge " << edge << " marked as internal\n";
   internal_edges->insert(edge);
   if (border_edges->count(edge) > 0) {
     FCL_THROW_FAILED_AT_THIS_CONFIGURATION(
@@ -1250,6 +1259,9 @@ static void ComputeVisiblePatchRecursive(
     std::unordered_set<ccd_pt_face_t*>* hidden_faces,
     std::unordered_set<ccd_pt_edge_t*>* internal_edges) {
   ccd_pt_edge_t* edge = f.edge[edge_index];
+  std::cerr << "ComputeVisiblePatchRecursive(face: " << &f << ", edge: "
+            << f.edge[edge_index] << ")\n";
+  std::cerr << "  Edge from (" << edge->vertex[0] << " to " << edge->vertex[1]  << "\n";
   /*
   This function will be called recursively. It first checks if the face `g`
   neighbouring face `f` along the common `edge` can be seen from the point
@@ -1259,14 +1271,18 @@ static void ComputeVisiblePatchRecursive(
   the faces adjacent to `g`.
   */
   ccd_pt_face_t* g = edge->faces[0] == &f ? edge->faces[1] : edge->faces[0];
+  std::cerr << "  Neighboring face: " << g << "\n";
   // TODO(SeanCurtis-TRI): Demand that g is not null.
   if (visible_faces->count(g) == 0) {
+    std::cerr << "  Face not previously marked visible\n";
     // g has not previously been classified as a visible face.
     if (hidden_faces->count(g) > 0) {
+      std::cerr << "    face previously classified as hidden\n";
       // Also not classified as hidden; we need to classify the edge.
       ClassifyBorderEdge(edge, border_edges, internal_edges);
       return;
     } else if (!isOutsidePolytopeFace(&polytope, g, &query_point)) {
+      std::cerr << "    face not visible; candidate border edge\n";
       // Cannot see the neighbouring face from the query point, but we know we
       // *can* see face f from the query point.
       if (!triangle_area_is_zero(query_point,
@@ -1281,6 +1297,8 @@ static void ComputeVisiblePatchRecursive(
         ClassifyBorderEdge(edge, border_edges, internal_edges);
         hidden_faces->insert(g);
         return;
+      } else {
+        std::cerr << "      point co-linear with edge\n";
       }
     }
     // We regard the edge f.edge[edge_index] not as an internal edge (not a
@@ -1371,6 +1389,9 @@ static void ComputeVisiblePatch(
   assert(internal_edges->empty());
   assert(isOutsidePolytopeFace(&polytope, &f, &query_point));
   std::unordered_set<ccd_pt_face_t*> hidden_faces;
+  std::cerr << "ComputeVisiblePatch(" << &f << ", ("
+            << query_point.v[0] <<  ", " << query_point.v[1] << ", "
+            << query_point.v[2] << "))\n";
   visible_faces->insert(&f);
   for (int edge_index = 0; edge_index < 3; ++edge_index) {
     ComputeVisiblePatchRecursive(polytope, f, edge_index, query_point,
@@ -1385,6 +1406,104 @@ static void ComputeVisiblePatch(
         "The visible patch failed its sanity check");
   }
 #endif
+}
+#if 0
+/** Simply prints the polytope to the console. */
+static void print_polytope(ccd_pt_t* p, const char* indent) {
+  std::cerr << indent << "Polytope: " << p <<"\n";
+
+  std::vector<ccd_pt_vertex_t*> vertices;
+  std::vector<ccd_pt_edge_t*> edges;
+  std::vector<_ccd_pt_face_t*> faces;
+  {
+    ccd_pt_vertex_t *v = nullptr;
+    ccdListForEachEntry(&p->vertices, v, ccd_pt_vertex_t, list) {
+      vertices.push_back(v);
+    }
+
+    _ccd_pt_edge_t *e = nullptr;
+    ccdListForEachEntry(&p->edges, e, _ccd_pt_edge_t, list) {
+      edges.push_back(e);
+    }
+    _ccd_pt_face_t *f = nullptr;
+    ccdListForEachEntry(&p->faces, f, _ccd_pt_face_t, list) {
+      faces.push_back(f);
+    }
+  }
+
+  std::cerr << indent << "  Vertices (" << vertices.size() << ")\n";
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    const ccd_vec3_t& v = vertices[i]->v.v;
+    std::cerr << indent << "    " << i << " (" << vertices[i] << "): "
+              << v.v[0] << ", " << v.v[1] << ", " << v.v[2] << "\n";
+  }
+
+  std::cerr << indent << "  Edges (" << edges.size() << ")\n";
+  for (size_t i = 0; i < edges.size(); ++i) {
+    const _ccd_pt_edge_t& e = *edges[i];
+    std::cerr << indent << "    " << i << "(" << &e << "): vertices("
+              << e.vertex[0] << ", " << e.vertex[1] << "), faces("
+              << e.faces[0] << ", " << e.faces[1] << ")\n";
+  }
+
+  std::cerr << indent << "  Faces (" << faces.size() << ")\n";
+  for (size_t i = 0; i < faces.size(); ++i) {
+    const _ccd_pt_face_t& f = *faces[i];
+    std::cerr << indent << "    " << i << "(" << &f << "): edges("
+              << f.edge[0] << ", " << f.edge[1] << ", " << f.edge[2] << ")\n";
+  }
+}
+#endif
+
+/** Simply prints the polytope to the console. */
+static void print_polytope_obj(ccd_pt_t* p, const char* indent) {
+  std::cerr << indent << "Polytope: " << p <<"\n";
+
+  std::vector<ccd_pt_vertex_t*> vertices;
+  std::unordered_map<ccd_pt_vertex_t*, int> vertex_index;
+  std::vector<ccd_pt_edge_t*> edges;
+  std::vector<_ccd_pt_face_t*> faces;
+  {
+    ccd_pt_vertex_t *v = nullptr;
+    ccdListForEachEntry(&p->vertices, v, ccd_pt_vertex_t, list) {
+      vertices.push_back(v);
+      // Objs are 1-indexed.
+      vertex_index[v] = static_cast<int>(vertices.size());
+    }
+
+    _ccd_pt_edge_t *e = nullptr;
+    ccdListForEachEntry(&p->edges, e, _ccd_pt_edge_t, list) {
+      edges.push_back(e);
+    }
+    _ccd_pt_face_t *f = nullptr;
+    ccdListForEachEntry(&p->faces, f, _ccd_pt_face_t, list) {
+      faces.push_back(f);
+    }
+  }
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    const ccd_vec3_t& v = vertices[i]->v.v;
+    std::cerr << "v " << v.v[0] << " " << v.v[1] << " " << v.v[2]
+              << "  # " << vertices[i] << "\n";
+  }
+  for (size_t i = 0; i < faces.size(); ++i) {
+    const _ccd_pt_face_t& f = *faces[i];
+    // We have no guarantee as to how the edges are ordered/defined. We assume
+    // that among the three edges, there are only three unique vertices
+    // represented.
+    int v0 = vertex_index.at(f.edge[0]->vertex[0]);
+    int v1 = vertex_index.at(f.edge[0]->vertex[1]);
+    int v2 = -1;
+    for (int e = 1; e < 3 && v2 < 0; ++e) {
+      for (int v = 0; v < 2; ++v) {
+        int v_cand = vertex_index.at(f.edge[e]->vertex[v]);
+        if (v_cand != v0 && v_cand != v1) {
+          v2 = v_cand;
+          break;
+        }
+      }
+    }
+    std::cerr << "f " << v0 << " " << v1 << " " << v2 << "  # " << &f << "\n";
+  }
 }
 
 /** Expands the polytope by adding a new vertex `newv` to the polytope. The
@@ -1416,6 +1535,9 @@ static void ComputeVisiblePatch(
 static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
                           const ccd_support_t *newv)
 {
+  std::cerr << "\nexpandPolytope(" << polytope << ", " << el << ", " << newv << ")\n";
+  print_polytope_obj(polytope, "  ");
+
   // The outline of the algorithm is as follows:
   //  1. Compute the visible patch relative to the new vertex (See
   //  ComputeVisiblePatch() for details).
@@ -1444,6 +1566,7 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
   if (el->type == CCD_PT_FACE) {
     start_face = reinterpret_cast<ccd_pt_face_t*>(el);
   } else if (el->type == CCD_PT_EDGE) {
+    std::cerr << "  el->type == CCD_PT_EDGE\n";
     // Check the two neighbouring faces of the edge.
     ccd_pt_face_t* f[2];
     ccdPtEdgeFaces(reinterpret_cast<ccd_pt_edge_t*>(el), &f[0], &f[1]);
@@ -1462,19 +1585,68 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
   std::unordered_set<ccd_pt_face_t*> visible_faces;
   std::unordered_set<ccd_pt_edge_t*> internal_edges;
   std::set<ccd_pt_edge_t*> border_edges;
+  std::cerr << "  ComputeVisiblePatch\n";
   ComputeVisiblePatch(*polytope, *start_face, newv->v, &border_edges,
                       &visible_faces, &internal_edges);
+  auto has_unique_pointers = [&internal_edges, &border_edges](const char* prefix) {
+    std::unordered_set<void*> pointers;
+    //    for (const auto p : visible_faces) {
+    //      pointers.insert((void*)p);
+    //    }
+    for (const auto p : internal_edges) {
+      pointers.insert((void*)p);
+    }
+    for (const auto p : border_edges) {
+      pointers.insert((void*)p);
+    }
+    const size_t expected_count = internal_edges.size() + border_edges.size();
+    if (expected_count != pointers.size()) {
+      std::cerr << prefix << ": has duplicate pointers !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+      std::cerr << "            total pointers: " << expected_count << ", unique pointers: " << pointers.size() << "\n";
+      for (const auto b : border_edges) {
+        for (const auto i: internal_edges) {
+          if (b == i) {
+            std::cerr << "            Edge " << b << " is both internal and boundary\n";
+          }
+        }
+      }
+    } else {
+      std::cerr << prefix << ": all unique pointers\n";
+    }
+  };
+
+  auto test_border_edges = [&border_edges](const char* prefix) {
+			     bool valid = true;
+    for (const auto& b : border_edges) {
+      if (b->vertex[0] == nullptr || b->vertex[1] == nullptr) {
+        std::cerr << prefix << ": border edge "
+              << b << " has at least one null vertex: "
+              << b->vertex[0] << ", " << b->vertex[1] << " ************************************\n";
+        valid = false;
+      }
+    }
+    if (valid) {
+      std::cerr << prefix << ": all boundary edges valid\n";
+    }
+  };
+
+  test_border_edges("    Coming out of compute visible patch");
+  has_unique_pointers("    Coming out of compute visible patch");
 
   // Now remove all the obsolete faces.
   // TODO(hongkai.dai@tri.global): currently we need to loop through each face
   // in visible_faces, and then do a linear search in the list pt->faces to
   // delete `face`. It would be better if we only loop through the list
   // polytope->faces for once. Same for the edges.
+  std::cerr << "  Removing visible faces\n";
   for (const auto& f : visible_faces) {
     ccdPtDelFace(polytope, f);
   }
 
+  test_border_edges("    After deleting visible faces");
+
   // Now remove all the obsolete edges.
+  std::cerr << "  Removing internal edges\n";
   for (const auto& e : internal_edges) {
     const int result = ccdPtDelEdge(polytope, e);
     if (result) {
@@ -1483,6 +1655,7 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
       break;
     }
   }
+  test_border_edges("    After deleting internal edges");
 
   // Note: this does not delete any vertices that were on the interior of the
   // deleted patch. There are no longer any faces or edges that reference it.
@@ -1497,30 +1670,43 @@ static int expandPolytope(ccd_pt_t *polytope, ccd_pt_el_t *el,
   // `newv`.
 
   // Now add the new vertex.
+  std::cerr << "  Adding new vertex\n";
   ccd_pt_vertex_t* new_vertex = ccdPtAddVertex(polytope, newv);
+  test_border_edges("    Adding new vertex");
 
   // Now add the new edges and faces, by connecting the new vertex with vertices
   // on border_edges. map_vertex_to_new_edge maps a vertex on the silhouette
   // edges to a new edge, with one end being the new vertex, and the other end
   // being that vertex on the silhouette edges.
   std::unordered_map<ccd_pt_vertex_t*, ccd_pt_edge_t*> map_vertex_to_new_edge;
+  std::cerr << "  Adding " << border_edges.size() << " new faces from border edges\n";
   for (const auto& border_edge : border_edges) {
     ccd_pt_edge_t* e[2];  // The two new edges added by connecting new_vertex
                           // to the two vertices on border_edge.
+    std::cerr << "    boundary edge: " << border_edge << "\n";
     for (int i = 0; i < 2; ++i) {
+      std::cerr << "      from vertex: " << border_edge->vertex[i] << "\n";
       auto it = map_vertex_to_new_edge.find(border_edge->vertex[i]);
       if (it == map_vertex_to_new_edge.end()) {
+	    std::cerr << "      new edge\n";
         // This edge has not been added yet.
         e[i] = ccdPtAddEdge(polytope, new_vertex, border_edge->vertex[i]);
+	    test_border_edges("        Adding an edge");
         map_vertex_to_new_edge.emplace_hint(it, border_edge->vertex[i], e[i]);
+	    std::cerr << "        added to map\n";
       } else {
+	    std::cerr << "      cached edge\n";
         e[i] = it->second;
       }
     }
     // Now add the face.
+    std::cerr << "      ccdPtAddFace(" << polytope << ", " << border_edge << ", " << e[0] << ", " << e[1] << "\n";
     ccdPtAddFace(polytope, border_edge, e[0], e[1]);
+    test_border_edges("        Adding a face");
   }
 
+  std::cerr << " Polytope expanded!\n";
+  print_polytope_obj(polytope, "  ");
   return 0;
 }
 
