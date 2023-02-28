@@ -476,6 +476,27 @@ void test_distance_box_box_regression6() {
   test_distance_box_box_helper(box1_size, X_WB1, box2_size, X_WB2, &expected_distance);
 }
 
+// This is a *specific* case that has cropped up in the wild. This error was
+// reported in https://github.com/RobotLocomotion/drake/issues/18704
+template <typename S>
+void test_distance_box_box_regression7() {
+  SCOPED_TRACE("test_distance_box_box_regression7");
+  const Vector3<S> box1_size(0.2999999999999999889, 0.2999999999999999889, 0.2999999999999999889);
+  Transform3<S> X_WB1 = Transform3<S>::Identity();
+  X_WB1.matrix() << 0.99983216350830295127,   0.017302258779861117571, 0.0060230104948389619895,  0.85626818476862631702,
+                   -0.017255387167394182352,  0.99982108658241231058, -0.0077489637286347464937, -0.77764714060125894601,
+                   -0.0061560074731557591632, 0.007643733791746519686, 0.9999518372930324972,     0.070907056388150049853,
+                    0,                        0,                       0,                         1;
+
+  const Vector3<S> box2_size(0.2999999999999999889, 0.2999999999999999889, 0.2999999999999999889);
+  Transform3<S> X_WB2 = Transform3<S>::Identity();
+  X_WB1.matrix() << 0.99985651556315335853,  0.016542340539402608512,  0.0036468144164748281071,  0.86027781426343519211,
+                   -0.016512132944187574157, 0.99983034011987759193,  -0.0081633596884769909358, -0.76973597919045266824,
+                   -0.003781236774290517872, 0.0081019716889417000422, 0.99996002935277783497,   -0.22878728666065184516,
+                    0,                       0,                        0,                         1;
+  test_distance_box_box_helper(box1_size, X_WB1, box2_size, X_WB2);
+}
+
 // Issue #493 outlines a number of scenarios that caused signed distance
 // failure. They consisted of two identical, stacked boxes. The boxes are
 // slightly tilted. The boxes were essentially touching but were separated by
@@ -602,6 +623,7 @@ GTEST_TEST(FCL_SIGNED_DISTANCE, RealWorldRegression) {
   test_distance_box_box_regression4<double>();
   test_distance_box_box_regression5<double>();
   test_distance_box_box_regression6<double>();
+  test_distance_box_box_regression7<double>();
   test_distance_box_box_regression_tilted_kissing_contact<double>();
   test_distance_sphere_box_regression1<double>();
 }
